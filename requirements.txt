@@ -1,8 +1,9 @@
-﻿streamlit
+streamlit
 pandas
 fuzzywuzzy
 python-Levenshtein
 selenium
 beautifulsoup4
 requests
+lxml
 webdriver-manager

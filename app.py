@@ -6,8 +6,12 @@ import pandas as pd
 from fuzzywuzzy import fuzz
 import os
 
-# Use cloud scraper if in cloud environment (detected by environment variable or platform)
-IS_CLOUD = os.environ.get("STREAMLIT_SERVER_PORT") is not None or os.environ.get("STREAMLIT_SHARING") is not None
+# Use cloud scraper if in cloud environment (Koyeb, Streamlit Cloud, etc.)
+IS_CLOUD = (
+    os.environ.get("PORT") is not None or  # Koyeb, Heroku, etc.
+    os.environ.get("STREAMLIT_SERVER_PORT") is not None or  # Streamlit Cloud
+    os.environ.get("KOYEB_APP_NAME") is not None  # Koyeb specific
+)
 
 if IS_CLOUD:
     from cloud_scraper import get_township_school_from_address

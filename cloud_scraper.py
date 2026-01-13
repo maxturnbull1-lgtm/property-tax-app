@@ -1,5 +1,5 @@
 # cloud_scraper.py
-# Cloud-compatible scraper using Selenium with Chrome (works on Linux cloud platforms)
+# Cloud-compatible scraper using Selenium with Chrome (works on Linux cloud platforms like Koyeb)
 
 import os
 import re
@@ -18,9 +18,19 @@ from selenium.webdriver.chrome.options import Options as ChromeOptions
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
+# Try to use lxml parser (faster), fall back to html.parser
+try:
+    import lxml
+    PARSER = "lxml"
+except ImportError:
+    PARSER = "html.parser"
+
 HTL_HOME = "https://michigan.hometownlocator.com/"
 LOOKUP_URL = "https://michigan.hometownlocator.com/maps/address-lookup.cfm"
 HEADERS = {"User-Agent": "Mozilla/5.0"}
+
+# Cache for address lookups (in-memory, persists for session)
+_address_cache: Dict[str, dict] = {}
 
 
 def _clean_text(s: str) -> str:
@@ -31,7 +41,7 @@ def _parse_address_page(html: str) -> Dict[str, Optional[str]]:
     """
     Parse HometownLocator page HTML into {township, county, school_district}.
     """
-    soup = BeautifulSoup(html, "html.parser")
+    soup = BeautifulSoup(html, PARSER)
     result: Dict[str, Optional[str]] = {"township": None, "county": None, "school_district": None}
 
     for section in soup.find_all("div", class_="halfcontentpadded"):
@@ -82,13 +92,15 @@ def _parse_address_page(html: str) -> Dict[str, Optional[str]]:
 def _try_fast_lookup(address: str) -> Optional[dict]:
     """
     Try HTTP fetch (no browser). Return parsed dict or None to indicate fallback.
+    Optimized with shorter timeout and connection reuse.
     """
     try:
-        r = requests.get(
+        session = requests.Session()
+        r = session.get(
             LOOKUP_URL,
             params={"addr": address},
             headers=HEADERS,
-            timeout=20,
+            timeout=10,
             allow_redirects=True,
         )
         if r.status_code != 200:
@@ -124,28 +136,36 @@ def _create_chrome_driver(headless: bool = True) -> Tuple[webdriver.Chrome, str]
     opts.add_argument("--disable-extensions")
     opts.add_argument("--log-level=3")
     opts.add_argument("--window-size=1200,900")
+    opts.add_argument("--single-process")  # Important for some cloud platforms
     
     # User agent
     opts.add_argument("--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36")
+    
+    # Speed optimizations - disable images
+    prefs = {
+        "profile.managed_default_content_settings.images": 2,
+        "profile.default_content_setting_values.notifications": 2,
+    }
+    opts.add_experimental_option("prefs", prefs)
+    opts.add_argument("--blink-settings=imagesEnabled=false")
     
     # Unique profile dir
     tmp_ud = tempfile.mkdtemp(prefix="chromedata_")
     opts.add_argument(f"--user-data-dir={tmp_ud}")
 
-    # For cloud platforms, Chrome/Chromium is typically installed system-wide
-    # Selenium will use chromedriver from PATH or we can use webdriver_manager
+    # For cloud platforms, use webdriver_manager or system chromedriver
     try:
-        # Try using webdriver_manager if available (handles driver installation)
         from selenium.webdriver.chrome.service import Service
         from webdriver_manager.chrome import ChromeDriverManager
         service = Service(ChromeDriverManager().install())
         driver = webdriver.Chrome(service=service, options=opts)
     except ImportError:
-        # Fallback: use system chromedriver
+        # Fallback: use system chromedriver (Koyeb has Chrome installed)
         service = ChromeService()
         driver = webdriver.Chrome(service=service, options=opts)
     
-    driver.set_page_load_timeout(40)
+    driver.set_page_load_timeout(20)
+    driver.set_script_timeout(10)
     
     return driver, tmp_ud
 
@@ -156,10 +176,17 @@ def get_township_school_from_address(address: str, headless: bool = True) -> dic
     Fast path first; fallback to Selenium if needed.
     Cloud-compatible version using Chrome.
     """
+    # Normalize address for cache key
+    cache_key = address.strip().lower()
+    
+    # Check cache first
+    if cache_key in _address_cache:
+        return _address_cache[cache_key]
 
     # ---- FAST PATH (no browser) ----
     fast = _try_fast_lookup(address)
     if fast:
+        _address_cache[cache_key] = fast
         return fast
 
     # ---- SELENIUM FALLBACK (Chrome for cloud) ----
@@ -168,7 +195,7 @@ def get_township_school_from_address(address: str, headless: bool = True) -> dic
 
     try:
         driver, tmp_ud = _create_chrome_driver(headless=headless)
-        wait = WebDriverWait(driver, 25)
+        wait = WebDriverWait(driver, 15)
 
         driver.get(HTL_HOME)
 
@@ -181,19 +208,29 @@ def get_township_school_from_address(address: str, headless: bool = True) -> dic
 
         # If results list appears, click first result
         try:
-            first = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "div.list-group a")))
+            first = WebDriverWait(driver, 3).until(
+                EC.element_to_be_clickable((By.CSS_SELECTOR, "div.list-group a"))
+            )
             first.click()
         except Exception:
             pass
 
-        # wait for page content to appear
-        wait.until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, "div.halfcontentpadded")))
+        # Wait for page content
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_all_elements_located((By.CSS_SELECTOR, "div.halfcontentpadded"))
+        )
 
         parsed = _parse_address_page(driver.page_source)
+        
+        # Cache successful results
+        if "error" not in parsed:
+            _address_cache[cache_key] = parsed
+        
         return parsed
 
     except Exception as e:
-        return {"error": str(e)}
+        error_result = {"error": str(e)}
+        return error_result
 
     finally:
         if driver:

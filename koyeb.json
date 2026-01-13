@@ -1,0 +1,11 @@
+{
+  "build": {
+    "builder": "DOCKERFILE",
+    "dockerfile_path": "Dockerfile"
+  },
+  "deploy": {
+    "restart_policy": {
+      "max_retries": 10
+    }
+  }
+}
