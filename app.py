@@ -4,7 +4,15 @@ import streamlit as st
 import pandas as pd
 
 from fuzzywuzzy import fuzz
-from selenium_scraper import get_township_school_from_address
+import os
+
+# Use cloud scraper if in cloud environment (detected by environment variable or platform)
+IS_CLOUD = os.environ.get("STREAMLIT_SERVER_PORT") is not None or os.environ.get("STREAMLIT_SHARING") is not None
+
+if IS_CLOUD:
+    from cloud_scraper import get_township_school_from_address
+else:
+    from selenium_scraper import get_township_school_from_address
 
 DB_PATH = "all_millage_rates.db"
 TABLE_NAME = "millage"
