@@ -25,14 +25,14 @@ This guide will help you deploy the Michigan Property Tax Estimator to Koyeb.
 
 1. **Select Repository**: Choose `maxturnbull1-lgtm/property-tax-app`
 2. **Branch**: Select `main`
-3. **Build**: 
-   - **Build Command**: `pip install -r requirements.txt`
-   - Koyeb will auto-detect Python
-4. **Run**:
-   - **Run Command**: Leave empty (uses Procfile) OR specify:
-     ```
-     streamlit run app.py --server.port=$PORT --server.address=0.0.0.0
-     ```
+3. **Build Settings**:
+   - **Build Command**: Leave EMPTY (buildpacks handle this automatically)
+   - **Do NOT** set a custom build command
+4. **Run Settings**:
+   - **Run Command**: Leave EMPTY (Procfile will be used automatically)
+   - OR manually set: `streamlit run app.py --server.port=$PORT --server.address=0.0.0.0`
+
+**IMPORTANT**: Koyeb buildpacks automatically detect and install dependencies from `requirements.txt`. Do not override this with custom build commands.
 
 ### Step 4: Configure Environment
 
