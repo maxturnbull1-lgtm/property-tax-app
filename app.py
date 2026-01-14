@@ -167,9 +167,17 @@ if st.button("Estimate Taxes"):
             st.write("**Address searched:**", address.strip())
             st.write("**Error details:**", scraped['error'])
             st.write("**Environment:**", "Cloud" if IS_CLOUD else "Local")
+            if "_debug" in scraped:
+                st.write("**Technical details:**", scraped['_debug'])
             st.code(str(scraped), language="json")
         
-        st.info("💡 **Tip**: The fast lookup method failed. You can try entering the address again, or the system will attempt to use the browser-based scraper.")
+        st.warning("💡 **Troubleshooting Tips:**")
+        st.markdown("""
+        - Try the address again (sometimes the site needs a moment)
+        - Make sure the address is complete (include city and state)
+        - Try a slightly different address format
+        - The system will automatically try multiple lookup methods
+        """)
         
         # Show a retry button
         if st.button("🔄 Try Again"):

@@ -93,28 +93,60 @@ def _try_fast_lookup(address: str) -> Optional[dict]:
     """
     Try HTTP fetch (no browser). Return parsed dict or None to indicate fallback.
     Optimized with shorter timeout and connection reuse.
+    Enhanced for better reliability on cloud platforms.
     """
     try:
         session = requests.Session()
+        
+        # First, try the direct lookup URL
         r = session.get(
             LOOKUP_URL,
             params={"addr": address},
             headers=HEADERS,
-            timeout=10,
+            timeout=15,  # Increased timeout for cloud
             allow_redirects=True,
         )
+        
+        if r.status_code != 200:
+            # Try alternative approach - go to home page first, then lookup
+            try:
+                home_r = session.get(HTL_HOME, headers=HEADERS, timeout=10)
+                if home_r.status_code == 200:
+                    # Try lookup again after getting home page
+                    r = session.get(
+                        LOOKUP_URL,
+                        params={"addr": address},
+                        headers=HEADERS,
+                        timeout=15,
+                        allow_redirects=True,
+                    )
+            except Exception:
+                pass
+        
         if r.status_code != 200:
             return None
 
         html = r.text
+        
+        # Check if we got redirected to a results page
         if "halfcontentpadded" not in html.lower():
+            # Maybe we need to follow redirects differently
+            # Check if there's a direct result in the HTML
+            if "township" in html.lower() or "school district" in html.lower():
+                # Try parsing anyway
+                parsed = _parse_address_page(html)
+                if parsed.get("township") or parsed.get("school_district"):
+                    return parsed
             return None
 
         parsed = _parse_address_page(html)
         if parsed.get("township") or parsed.get("school_district"):
             return parsed
         return None
-    except Exception:
+    except Exception as e:
+        # Log error but don't crash - return None to try browser fallback
+        import sys
+        print(f"Fast lookup error: {str(e)}", file=sys.stderr)
         return None
 
 
