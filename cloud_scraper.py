@@ -332,27 +332,33 @@ def get_township_school_from_address(address: str, headless: bool = True) -> dic
         return parsed
 
     except Exception as e:
-        # If Selenium fails, try Playwright as fallback
+        # If Selenium fails, try Playwright as fallback (works better in cloud)
         error_msg = str(e)
-        if "Chrome instance exited" in error_msg or "session not created" in error_msg:
-            # Try Playwright as fallback
-            try:
-                from playwright_scraper import get_township_school_from_address as playwright_lookup
-                result = playwright_lookup(address)
-                if result and "error" not in result:
-                    _address_cache[cache_key] = result
-                    result["_method"] = "Playwright (Chromium)"
-                    return result
-            except Exception as playwright_error:
-                pass
+        
+        # Always try Playwright as fallback when Selenium fails
+        try:
+            from playwright_scraper import get_township_school_from_address as playwright_lookup
+            result = playwright_lookup(address)
+            if result and "error" not in result:
+                _address_cache[cache_key] = result
+                result["_method"] = "Playwright (Chromium) - Fallback"
+                return result
+        except Exception as playwright_error:
+            # Playwright also failed, log for debugging
+            import sys
+            print(f"Playwright fallback failed: {str(playwright_error)}", file=sys.stderr)
         
         # Return a user-friendly error message
         if "Chrome instance exited" in error_msg or "session not created" in error_msg:
             error_result = {
-                "error": "Browser failed to start. The fast lookup method will be used when possible."
+                "error": "Browser automation failed. Please try again - the system will attempt alternative methods.",
+                "_debug": error_msg
             }
         else:
-            error_result = {"error": f"Scraper error: {error_msg}"}
+            error_result = {
+                "error": f"Scraper error: {error_msg}. Please try again or check the address format.",
+                "_debug": error_msg
+            }
         return error_result
 
     finally:
