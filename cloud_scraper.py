@@ -256,6 +256,7 @@ def get_township_school_from_address(address: str, headless: bool = True) -> dic
     fast = _try_fast_lookup(address)
     if fast:
         _address_cache[cache_key] = fast
+        fast["_method"] = "HTTP (Fast)"
         return fast
 
     # ---- SELENIUM FALLBACK (Chrome for cloud) ----
@@ -294,6 +295,7 @@ def get_township_school_from_address(address: str, headless: bool = True) -> dic
         # Cache successful results
         if "error" not in parsed:
             _address_cache[cache_key] = parsed
+            parsed["_method"] = "Selenium (Chrome)"
         
         return parsed
 
@@ -307,6 +309,7 @@ def get_township_school_from_address(address: str, headless: bool = True) -> dic
                 result = playwright_lookup(address)
                 if result and "error" not in result:
                     _address_cache[cache_key] = result
+                    result["_method"] = "Playwright (Chromium)"
                     return result
             except Exception as playwright_error:
                 pass

@@ -150,7 +150,14 @@ if st.button("Estimate Taxes"):
         st.warning("Please enter both the address and property value.")
         st.stop()
 
-    scraped = get_township_school_from_address(address.strip(), headless=HEADLESS)
+    # Show progress indicator
+    with st.spinner("🔍 Looking up address information..."):
+        status_placeholder = st.empty()
+        status_placeholder.info("⏳ Starting address lookup...")
+        
+        scraped = get_township_school_from_address(address.strip(), headless=HEADLESS)
+        
+        status_placeholder.empty()
 
     if isinstance(scraped, dict) and "error" in scraped:
         st.error(f"⚠️ {scraped['error']}")
