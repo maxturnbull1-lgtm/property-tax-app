@@ -153,7 +153,12 @@ if st.button("Estimate Taxes"):
     scraped = get_township_school_from_address(address.strip(), headless=HEADLESS)
 
     if isinstance(scraped, dict) and "error" in scraped:
-        st.error(f"Scraper error: {scraped['error']}")
+        st.error(f"⚠️ {scraped['error']}")
+        st.info("💡 **Tip**: The fast lookup method failed. You can try entering the address again, or the system will attempt to use the browser-based scraper.")
+        
+        # Show a retry button
+        if st.button("🔄 Try Again"):
+            st.rerun()
         st.stop()
 
     township_raw = (scraped.get("township") or "").strip()

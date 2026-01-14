@@ -191,39 +191,40 @@ def _create_chrome_driver(headless: bool = True) -> Tuple[webdriver.Chrome, str]
     if chrome_binary:
         opts.binary_location = chrome_binary
     
-    # Use webdriver_manager for driver, which handles Chrome binary detection
+    # Try to use system chromedriver first (more reliable in Docker)
     try:
-        from selenium.webdriver.chrome.service import Service
-        from webdriver_manager.chrome import ChromeDriverManager
-        from webdriver_manager.core.os_manager import ChromeType
+        chromedriver_paths = [
+            "/usr/bin/chromedriver",
+            "/usr/local/bin/chromedriver",
+            "/snap/bin/chromium.chromedriver",
+        ]
+        chromedriver_path = None
+        for path in chromedriver_paths:
+            if os.path.exists(path):
+                chromedriver_path = path
+                break
         
-        # Try to use webdriver_manager
-        if chrome_binary and "chromium" in chrome_binary.lower():
-            service = Service(ChromeDriverManager(chrome_type=ChromeType.CHROMIUM).install())
+        if chromedriver_path:
+            service = ChromeService(executable_path=chromedriver_path)
         else:
-            service = Service(ChromeDriverManager().install())
+            # Try webdriver_manager as fallback
+            from selenium.webdriver.chrome.service import Service
+            from webdriver_manager.chrome import ChromeDriverManager
+            from webdriver_manager.core.os_manager import ChromeType
+            
+            if chrome_binary and "chromium" in chrome_binary.lower():
+                service = Service(ChromeDriverManager(chrome_type=ChromeType.CHROMIUM).install())
+            else:
+                service = Service(ChromeDriverManager().install())
+        
+        # Add service logging for debugging (can be removed in production)
+        service.log_path = "/tmp/chromedriver.log"
         
         driver = webdriver.Chrome(service=service, options=opts)
     except Exception as e:
-        # Fallback: try system chromedriver
+        # Last resort: try without explicit service
         try:
-            chromedriver_paths = [
-                "/usr/bin/chromedriver",
-                "/usr/local/bin/chromedriver",
-                "/snap/bin/chromium.chromedriver",
-            ]
-            chromedriver_path = None
-            for path in chromedriver_paths:
-                if os.path.exists(path):
-                    chromedriver_path = path
-                    break
-            
-            if chromedriver_path:
-                service = ChromeService(executable_path=chromedriver_path)
-            else:
-                service = ChromeService()
-            
-            driver = webdriver.Chrome(service=service, options=opts)
+            driver = webdriver.Chrome(options=opts)
         except Exception as e2:
             raise Exception(
                 f"Could not initialize Chrome driver. "
@@ -297,7 +298,14 @@ def get_township_school_from_address(address: str, headless: bool = True) -> dic
         return parsed
 
     except Exception as e:
-        error_result = {"error": str(e)}
+        # Return a user-friendly error message
+        error_msg = str(e)
+        if "Chrome instance exited" in error_msg or "session not created" in error_msg:
+            error_result = {
+                "error": "Chrome browser failed to start. Please try again or contact support if the issue persists."
+            }
+        else:
+            error_result = {"error": f"Scraper error: {error_msg}"}
         return error_result
 
     finally:
