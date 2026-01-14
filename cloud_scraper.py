@@ -298,11 +298,23 @@ def get_township_school_from_address(address: str, headless: bool = True) -> dic
         return parsed
 
     except Exception as e:
-        # Return a user-friendly error message
+        # If Selenium fails, try Playwright as fallback
         error_msg = str(e)
         if "Chrome instance exited" in error_msg or "session not created" in error_msg:
+            # Try Playwright as fallback
+            try:
+                from playwright_scraper import get_township_school_from_address as playwright_lookup
+                result = playwright_lookup(address)
+                if result and "error" not in result:
+                    _address_cache[cache_key] = result
+                    return result
+            except Exception as playwright_error:
+                pass
+        
+        # Return a user-friendly error message
+        if "Chrome instance exited" in error_msg or "session not created" in error_msg:
             error_result = {
-                "error": "Chrome browser failed to start. Please try again or contact support if the issue persists."
+                "error": "Browser failed to start. The fast lookup method will be used when possible."
             }
         else:
             error_result = {"error": f"Scraper error: {error_msg}"}
