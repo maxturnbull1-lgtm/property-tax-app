@@ -45,8 +45,8 @@ RUN apt-get update && \
     xdg-utils \
     && rm -rf /var/lib/apt/lists/*
 
-# Set Chrome binary location
-ENV CHROMIUM_FLAGS="--no-sandbox --disable-dev-shm-usage"
+# Set Chrome binary location and environment
+ENV CHROMIUM_FLAGS="--no-sandbox --disable-dev-shm-usage --disable-gpu"
 ENV PYTHONUNBUFFERED=1
 ENV PORT=8000
 
