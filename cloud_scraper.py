@@ -128,15 +128,21 @@ def _create_chrome_driver(headless: bool = True) -> Tuple[webdriver.Chrome, str]
     if headless:
         opts.add_argument("--headless=new")
     
-    # Cloud deployment options
+    # Cloud deployment options - essential for Docker/containers
     opts.add_argument("--no-sandbox")
     opts.add_argument("--disable-dev-shm-usage")
     opts.add_argument("--disable-gpu")
     opts.add_argument("--disable-software-rasterizer")
     opts.add_argument("--disable-extensions")
+    opts.add_argument("--disable-setuid-sandbox")
+    opts.add_argument("--disable-background-timer-throttling")
+    opts.add_argument("--disable-backgrounding-occluded-windows")
+    opts.add_argument("--disable-renderer-backgrounding")
+    opts.add_argument("--disable-features=TranslateUI")
+    opts.add_argument("--disable-ipc-flooding-protection")
     opts.add_argument("--log-level=3")
     opts.add_argument("--window-size=1200,900")
-    opts.add_argument("--single-process")  # Important for some cloud platforms
+    opts.add_argument("--remote-debugging-port=9222")
     
     # User agent
     opts.add_argument("--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36")
