@@ -160,7 +160,15 @@ if st.button("Estimate Taxes"):
         status_placeholder.empty()
 
     if isinstance(scraped, dict) and "error" in scraped:
-        st.error(f"⚠️ {scraped['error']}")
+        st.error(f"⚠️ **Scraper Error**: {scraped['error']}")
+        
+        # Show debug info
+        with st.expander("🔧 Debug Information"):
+            st.write("**Address searched:**", address.strip())
+            st.write("**Error details:**", scraped['error'])
+            st.write("**Environment:**", "Cloud" if IS_CLOUD else "Local")
+            st.code(str(scraped), language="json")
+        
         st.info("💡 **Tip**: The fast lookup method failed. You can try entering the address again, or the system will attempt to use the browser-based scraper.")
         
         # Show a retry button
@@ -168,13 +176,40 @@ if st.button("Estimate Taxes"):
             st.rerun()
         st.stop()
 
+    # Show success message
+    st.success("✅ Address lookup successful!")
+    
     township_raw = (scraped.get("township") or "").strip()
     school_raw = (scraped.get("school_district") or scraped.get("school") or "").strip()
     county_raw = (scraped.get("county") or "").strip()
 
+    # Show what was found
+    with st.expander("🔍 Raw Scraper Results"):
+        st.write(f"**Township:** {township_raw if township_raw else 'Not found'}")
+        st.write(f"**School District:** {school_raw if school_raw else 'Not found'}")
+        st.write(f"**County:** {county_raw if county_raw else 'Not found'}")
+        
+        # Show which method was used
+        if "_method" in scraped:
+            st.info(f"📡 **Lookup method:** {scraped['_method']}")
+        
+        # Show full scraped data for debugging
+        st.write("**Full scraped data:**")
+        st.json(scraped)
+
     if not township_raw or not school_raw:
         st.error("Could not extract township and/or school district from that address.")
+        
+        # Show debug info
+        with st.expander("🔧 Debug Information"):
+            st.write("**Raw scraped data:**")
+            st.json(scraped)
+            st.write("**Township found:**", township_raw)
+            st.write("**School found:**", school_raw)
         st.stop()
+    
+    # Show matching progress
+    st.info("🎯 Finding best millage rate matches...")
 
     target_key, top = find_top_matches(millage_df, township_raw, school_raw, top_n=8)
 
