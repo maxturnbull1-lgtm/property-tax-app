@@ -11,6 +11,7 @@ RUN apt-get update && \
 # Set Chrome binary location
 ENV CHROMIUM_FLAGS="--no-sandbox --disable-dev-shm-usage"
 ENV PYTHONUNBUFFERED=1
+ENV PORT=8000
 
 WORKDIR /app
 
@@ -22,14 +23,8 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Copy application files
 COPY . .
 
-# Expose port (Koyeb uses PORT env var, defaults to 8000)
+# Expose port 8000 (Koyeb default)
 EXPOSE 8000
 
-# Create startup script that uses PORT env var
-RUN echo '#!/bin/bash\n\
-export PORT=${PORT:-8000}\n\
-streamlit run app.py --server.port=$PORT --server.address=0.0.0.0' > /start.sh && \
-    chmod +x /start.sh
-
-# Run Streamlit using PORT from environment
-CMD ["/start.sh"]
+# Run Streamlit - use PORT env var (Koyeb sets this to 8000)
+CMD streamlit run app.py --server.port=${PORT:-8000} --server.address=0.0.0.0
