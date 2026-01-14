@@ -22,8 +22,14 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Copy application files
 COPY . .
 
-# Expose Streamlit port
-EXPOSE 8501
+# Expose port (Koyeb uses PORT env var, defaults to 8000)
+EXPOSE 8000
 
-# Run Streamlit
-CMD ["streamlit", "run", "app.py", "--server.port=8501", "--server.address=0.0.0.0"]
+# Create startup script that uses PORT env var
+RUN echo '#!/bin/bash\n\
+export PORT=${PORT:-8000}\n\
+streamlit run app.py --server.port=$PORT --server.address=0.0.0.0' > /start.sh && \
+    chmod +x /start.sh
+
+# Run Streamlit using PORT from environment
+CMD ["/start.sh"]

@@ -6,6 +6,13 @@
   "deploy": {
     "restart_policy": {
       "max_retries": 10
+    },
+    "http_port": 8000
+  },
+  "routes": [
+    {
+      "path": "/",
+      "port": 8000
     }
-  }
+  ]
 }
