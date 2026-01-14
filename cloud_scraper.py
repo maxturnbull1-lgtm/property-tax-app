@@ -153,16 +153,78 @@ def _create_chrome_driver(headless: bool = True) -> Tuple[webdriver.Chrome, str]
     tmp_ud = tempfile.mkdtemp(prefix="chromedata_")
     opts.add_argument(f"--user-data-dir={tmp_ud}")
 
-    # For cloud platforms, use webdriver_manager or system chromedriver
+    # For cloud platforms, specify Chrome binary location explicitly
+    # Try multiple common locations for Chrome/Chromium
+    chrome_binary_locations = [
+        "/usr/bin/chromium-browser",  # Most common on Ubuntu/Debian
+        "/usr/bin/chromium",
+        "/usr/bin/google-chrome",
+        "/usr/bin/google-chrome-stable",
+        "/snap/bin/chromium",
+        "/usr/lib/chromium-browser/chromium-browser",
+    ]
+    
+    chrome_binary = None
+    for location in chrome_binary_locations:
+        if os.path.exists(location):
+            chrome_binary = location
+            break
+    
+    # Also try using 'which' command as fallback
+    if not chrome_binary:
+        import subprocess
+        for cmd in ["chromium-browser", "chromium", "google-chrome", "google-chrome-stable"]:
+            try:
+                result = subprocess.run(["which", cmd], capture_output=True, text=True, timeout=2)
+                if result.returncode == 0 and result.stdout.strip():
+                    chrome_binary = result.stdout.strip()
+                    break
+            except Exception:
+                pass
+    
+    if chrome_binary:
+        opts.binary_location = chrome_binary
+    
+    # Use webdriver_manager for driver, which handles Chrome binary detection
     try:
         from selenium.webdriver.chrome.service import Service
         from webdriver_manager.chrome import ChromeDriverManager
-        service = Service(ChromeDriverManager().install())
+        from webdriver_manager.core.os_manager import ChromeType
+        
+        # Try to use webdriver_manager
+        if chrome_binary and "chromium" in chrome_binary.lower():
+            service = Service(ChromeDriverManager(chrome_type=ChromeType.CHROMIUM).install())
+        else:
+            service = Service(ChromeDriverManager().install())
+        
         driver = webdriver.Chrome(service=service, options=opts)
-    except ImportError:
-        # Fallback: use system chromedriver (Koyeb has Chrome installed)
-        service = ChromeService()
-        driver = webdriver.Chrome(service=service, options=opts)
+    except Exception as e:
+        # Fallback: try system chromedriver
+        try:
+            chromedriver_paths = [
+                "/usr/bin/chromedriver",
+                "/usr/local/bin/chromedriver",
+                "/snap/bin/chromium.chromedriver",
+            ]
+            chromedriver_path = None
+            for path in chromedriver_paths:
+                if os.path.exists(path):
+                    chromedriver_path = path
+                    break
+            
+            if chromedriver_path:
+                service = ChromeService(executable_path=chromedriver_path)
+            else:
+                service = ChromeService()
+            
+            driver = webdriver.Chrome(service=service, options=opts)
+        except Exception as e2:
+            raise Exception(
+                f"Could not initialize Chrome driver. "
+                f"Chrome binary searched: {chrome_binary_locations}, "
+                f"Found: {chrome_binary}, "
+                f"Error: {str(e2)}"
+            )
     
     driver.set_page_load_timeout(20)
     driver.set_script_timeout(10)
